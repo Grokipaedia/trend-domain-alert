@@ -48,6 +48,32 @@ What I could **not** test, because they need your own accounts:
   the response format is exactly as documented.
 - **Telegram delivery** — straightforward, but untested end-to-end.
 
+## v1.1: Momentum and a transparent score
+
+Two additions, both built from data the tool already collects — no new
+infrastructure, and deliberately **no LLM-guessed confidence percentage**.
+A prior version of this idea used numbers like "Confidence: 91%" and
+"Opportunity score: 87/100" with nothing real underneath them — the same
+failure mode as fabricated statistics elsewhere. Every point here traces
+to something countable:
+
+- **Momentum** (`term_history.json`, new file): tracks how many times a
+  normalized term has been seen across scan runs. A term mentioned once
+  is unproven; one still showing up days later has demonstrated real
+  staying power. Shows as "\U0001F195 First sighting" or "\U0001F525 Rising \u2014 seen Nx".
+- **Score (0-100)**: momentum contributes up to 50 points (10 per mention,
+  capped at 5), and TLD availability breadth contributes up to 50 (scaled
+  by what fraction of checked TLDs are actually free). The alert shows
+  both components separately, so "why is this 80?" always has a real
+  answer: "seen 3 times, 2 of 2 checked TLDs available" — never "the AI
+  thought so."
+
+Deliberately **not** included yet: buyer-segment framing (naming
+agencies, VCs, SEO agencies) and sector classification. Both are good
+ideas worth pursuing, but only after the core detection has run for real
+and proven its signal quality — no point layering more structure on an
+unvalidated foundation.
+
 ## Setup
 
 1. **Get three things:**
