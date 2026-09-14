@@ -31,10 +31,10 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python scan.py
 
-      - name: Commit updated seen-items state
+      - name: Commit updated seen-items and term-history state
         run: |
           git config user.name "trend-domain-alert-bot"
           git config user.email "actions@github.com"
-          git add seen.json
-          git diff --staged --quiet || git commit -m "Update seen items [skip ci]"
+          git add seen.json term_history.json
+          git diff --staged --quiet || git commit -m "Update tracking state [skip ci]"
           git push
