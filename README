@@ -1,0 +1,96 @@
+# Trend Domain Alert
+
+Watches a curated list of news feeds for newly-coined terms — acronyms,
+program names, policy names — and alerts you via Telegram the moment a
+matching domain is found available. Built after catching ICNEV.com within
+hours of the term hitting the news; this automates that same watch-and-
+check loop.
+
+## How it works
+
+1. **Feed scan** — polls the RSS feeds in `feeds.json` on a schedule.
+2. **Extraction** — each new item is sent to Claude (Haiku, for speed and
+   cost) with a strict prompt: is a genuinely new term being introduced
+   here, not just an existing one being mentioned again? Fails closed —
+   any error or ambiguous case is treated as "no," never guessed as "yes."
+3. **Domain check** — for anything flagged, generates candidate domains
+   (the full term, plus the acronym if the term is a multi-word phrase —
+   both matter, since the acronym is often the more valuable one) and
+   checks `.com`/`.io`/`.ai` availability via Dynadot's API.
+4. **Alert** — if anything's available, sends you a Telegram message
+   immediately with the term, why it might matter, the available
+   domain(s), and the source link. You decide whether to buy — nothing
+   is purchased automatically.
+
+## What's tested, what needs your own credentials
+
+I tested the parts that don't need live external accounts:
+
+- **Feed parsing and de-duplication** — verified against a sample feed;
+  confirmed it correctly identifies new items and doesn't re-alert on
+  ones already seen across runs.
+- **Domain-candidate generation** — verified the acronym-extraction fix
+  specifically, since the first version would have missed something like
+  "ICNEV" entirely and only generated the useless 38-character full-phrase
+  version. Confirmed fixed.
+- **Error handling** — confirmed the extraction step fails closed (returns
+  "not found" rather than crashing or guessing) when it can't reach the
+  API, since I don't have a live Anthropic key in this environment.
+
+What I could **not** test, because they need your own accounts:
+
+- **Actual extraction accuracy** — whether Claude correctly identifies
+  genuinely new terms vs. false positives, once wired to a real API key.
+  Worth watching the first week of alerts closely and tightening the
+  prompt if it's too trigger-happy or too quiet.
+- **Dynadot's actual API response shape** — I built this against their
+  documented API, but haven't been able to make a live call to confirm
+  the response format is exactly as documented.
+- **Telegram delivery** — straightforward, but untested end-to-end.
+
+## Setup
+
+1. **Get three things:**
+   - An Anthropic API key (console.anthropic.com)
+   - A Dynadot API key (Dynadot account settings — you already have an
+     account)
+   - A Telegram bot token: message @BotFather on Telegram, `/newbot`,
+     follow the prompts. Then get your chat ID by messaging your new bot
+     once and visiting `https://api.telegram.org/bot<TOKEN>/getUpdates`
+     — your chat ID appears in the response.
+
+2. **Create the GitHub repo** and add these as repository secrets
+   (Settings → Secrets and variables → Actions):
+   - `ANTHROPIC_API_KEY`
+   - `DYNADOT_API_KEY`
+   - `TELEGRAM_BOT_TOKEN`
+   - `TELEGRAM_CHAT_ID`
+
+3. **Push these files** to the repo, keeping the folder structure
+   (especially `.github/workflows/scan.yml`).
+
+4. **Curate `feeds.json`** — the starter list is generic tech-news RSS
+   feeds, unverified live (I couldn't fetch them from this environment
+   to confirm the URLs are current). Replace/expand it with sources
+   specific to the sectors you actually understand and watch — the
+   narrower and more relevant the list, the better the signal-to-noise
+   ratio, and the whole value of this tool depends on that curation, not
+   on the code.
+
+5. **Watch the first week of alerts closely** before trusting it fully —
+   tighten the extraction prompt in `scan.py` if you're getting false
+   positives (existing terms flagged as new) or missing real ones.
+
+## A real timing caveat
+
+GitHub Actions' scheduled cron jobs are not perfectly reliable at short
+intervals — a `*/15` schedule can genuinely run 20-30+ minutes late during
+high platform load, per GitHub's own documented behavior. Given that
+ICNEV.com was grabbed within hours of the news breaking, a 15-30 minute
+lag is probably fine for now, but if speed turns out to matter more than
+that, a dedicated always-on process (a small VPS or serverless cron)
+would be more reliable than GitHub Actions for this specific job.
+
+## License
+
+MIT — see LICENSE.
