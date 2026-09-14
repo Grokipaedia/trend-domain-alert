@@ -1,0 +1,40 @@
+name: Trend Domain Scan
+
+on:
+  schedule:
+    # Runs every 15 minutes. GitHub Actions cron can lag under load --
+    # treat this as "at least every ~20-30 min," not exact.
+    - cron: '*/15 * * * *'
+  workflow_dispatch: {}   # lets you trigger a run manually from the Actions tab
+
+permissions:
+  contents: write   # needed to commit the updated seen.json back to the repo
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install feedparser anthropic requests
+
+      - name: Run scan
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DYNADOT_API_KEY: ${{ secrets.DYNADOT_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scan.py
+
+      - name: Commit updated seen-items state
+        run: |
+          git config user.name "trend-domain-alert-bot"
+          git config user.email "actions@github.com"
+          git add seen.json
+          git diff --staged --quiet || git commit -m "Update seen items [skip ci]"
+          git push
