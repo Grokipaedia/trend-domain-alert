@@ -74,6 +74,38 @@ ideas worth pursuing, but only after the core detection has run for real
 and proven its signal quality — no point layering more structure on an
 unvalidated foundation.
 
+## v1.2: A blocklist, before anything else
+
+Real, practical feedback from a domain-registrar forum, worth taking
+seriously: speed without judgment turns into a pile of junk (or worse,
+legally risky) registrations. Trademarks, private individuals' names
+pulled from news stories, disaster/tragedy terms, and one-off viral
+moments with no lasting reuse value should never reach the alert stage,
+no matter how good the momentum or availability score looks.
+
+**Design choice, and it's the opposite of the extraction step's safety
+default on purpose:** `extract_new_term` fails *closed* -- when uncertain,
+assume "not a new term," to avoid false alarms. `check_blocklist` fails
+*safe* -- when uncertain, assume "block it," because a missed opportunity
+costs nothing, while suggesting a trademarked name or a tragedy-derived
+domain costs real reputation and possibly real legal exposure.
+
+**A real tradeoff this creates, tested and confirmed:** if the blocklist
+check itself fails for any reason (bad API key, network error, malformed
+response), the tool blocks *every* term that run, not just risky ones --
+by design. This means a flaky connection doesn't just risk missing a
+genuinely risky term slipping through; it can silently go quiet on
+everything for a scan cycle. That's the right conservative default, but
+worth knowing it's there rather than discovering it as "why did nothing
+alert today" during a real outage.
+
+**Tested:** all four realistic response shapes -- a clean pass, a real
+block with a category and explanation, a genuinely malformed response,
+and the common LLM quirk of wrapping JSON in markdown code fences.
+**Not tested:** actual classification accuracy against a real, wide
+range of terms, which needs your live API key and, like the extraction
+step, is worth watching closely during the first couple of weeks.
+
 ## Setup
 
 1. **Get three things:**
