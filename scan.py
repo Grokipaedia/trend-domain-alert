@@ -168,6 +168,58 @@ or
     return {"found": False}
 
 
+def check_blocklist(client, term, reason):
+    """
+    Screens a candidate term for categories that should never be suggested
+    as a registration opportunity, regardless of how strong the momentum or
+    availability score looks. This is the inverse safety design from
+    extract_new_term: there, uncertainty defaults to "not a new term" (fail
+    closed, avoid false alarms). Here, uncertainty defaults to "block it"
+    (fail SAFE, avoid suggesting something legally or ethically risky) --
+    a missed opportunity costs nothing; a suggested trademark or tragedy
+    domain costs real reputation and possibly real legal exposure.
+
+    Returns: {"blocked": bool, "category": str or None, "explanation": str}
+    """
+    prompt = f"""You are screening a candidate domain-name term for red flags
+before it's suggested as a registration opportunity. Block the term if it
+falls into ANY of these categories:
+
+1. TRADEMARK: matches or is confusingly similar to an existing company name,
+   product name, or registered trademark.
+2. PRIVATE_INDIVIDUAL: refers to or is derived from a private (non-public-
+   figure) person's real name, drawn from a news story about them.
+3. DISASTER: relates to a disaster, tragedy, death, or crisis event --
+   suggesting a domain from this would read as exploiting the event.
+4. FLASH_NEWS: describes a single viral moment or one-off event name, not
+   an actual reusable term/acronym/product name likely to see repeated
+   future use.
+
+Term: "{term}"
+Context: {reason}
+
+Respond with ONLY a JSON object:
+{{"blocked": true, "category": "TRADEMARK", "explanation": "one sentence"}}
+or
+{{"blocked": false}}
+"""
+    try:
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=150,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = response.content[0].text.strip()
+        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip())
+        parsed = json.loads(raw)
+        if "blocked" in parsed:
+            return parsed
+    except Exception as e:
+        print(f"  [WARN] Blocklist check itself failed for '{term}': {e} -- blocking as a precaution")
+    # Any failure -- malformed response, API error, anything -- blocks by default
+    return {"blocked": True, "category": "CHECK_FAILED", "explanation": "the safety check itself could not be completed"}
+
+
 def term_to_domain_candidates(term):
     """
     Turn an extracted term into candidate bare-domain strings.
@@ -296,6 +348,13 @@ def main():
         term = result["term"]
         reason = result.get("reason", "")
         print(f"  Candidate term: '{term}' -- {reason}")
+
+        block_result = check_blocklist(client, term, reason)
+        if block_result.get("blocked"):
+            category = block_result.get("category", "UNKNOWN")
+            explanation = block_result.get("explanation", "")
+            print(f"    BLOCKED [{category}]: {explanation}")
+            continue
 
         momentum = update_term_history(term_history, term, time.time())
 
